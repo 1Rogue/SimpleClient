@@ -25,7 +25,7 @@ directory as the `natives-######...`.
 Using SimpleClient in your code can be as simple and painless as:
 
 ```java
-new SimpleClient("1.7.9", "username", "password", new File("%APPDATA%")).openMinecraft();
+new SimpleClient("1.7.9", "username", "password", new File(System.getenv("APPDATA"))).openMinecraft();
 ```
 
 Of course, there are a couple of things outside of this to be aware of, but that's the main thing really.
@@ -45,6 +45,13 @@ And that is really the jist of it all.
 
 **Do note, however**, that opening the minecraft client creates a subproccess and that your main process
 (the one launching the client) will not close unless you specifically call `System#exit(int)`.
+
+These are the parameters for the constructor:
+
+ * [0] -> Version
+ * [1] -> Username
+ * [2] -> Password
+ * [3] -> a File instance representing the folder that contains the .minecraft folder.
 
 ## <a name="bugs"></a>Noted and unverifiable bugs
 
