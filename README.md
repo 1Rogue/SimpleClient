@@ -3,8 +3,22 @@ SimpleClient
 
 ## Table of contents
 
+ * __[Preparing a version for use](#prepare)__
  * __[Using SimpleClient](#usage)__
  * __[Noted and unverifiable bugs](#bugs)__
+
+## <a name="prepare"></a>Preparing a version for use
+
+Before doing anything, you will need to make sure that the natives are available for
+SimpleClient to make use of. In the future, this may no longer be necessary, but for now
+it's simple a step that needs to be taken.
+
+To make the natives available, launch minecraft normally as you wish, and then open the
+relevant folder for your current version. This should be located under somewhere such as
+`.minecraft/versions/1.7.9` or any variation. In this folder *while the client is running*,
+you should see a folder along the lines of `natives-######...`, simply copy the contents of
+that folder into a new folder named `natives`. This `natives` folder should be in the same
+directory as the `natives-######...`.
 
 ## <a name="usage"></a>Using SimpleClient
 
