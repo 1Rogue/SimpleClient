@@ -29,7 +29,7 @@ import java.io.IOException;
 public class ExampleMain {
 
     public static void main(String[] args) throws IOException {
-        new SimpleClient("1.7.9", "username", "password", new File("%APPDATA%")).openMinecraft();
+        new SimpleClient("1.7.9", "username", "password", new File(System.getenv("APPDATA")));
         System.exit(0); // Needed if you don't want the parent process to monitor
     }
 
