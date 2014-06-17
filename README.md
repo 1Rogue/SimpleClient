@@ -36,8 +36,7 @@ be done with `stdin` as shown below:
 
 ```java
 public static void main(String[] args) throws IOException {
-    Scanner scan = new Scanner(System.in);
-    new SimpleClient(scan).openMinecraft();
+    new SimpleClient(new Scanner(System.in)).openMinecraft();
     System.exit(0);
 }
 ```
