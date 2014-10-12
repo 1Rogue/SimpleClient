@@ -180,7 +180,16 @@ public final class SimpleClient {
         mc.appendTag("userProperties", "{}", " ");
         mc.appendTag("accessToken", (String) this.response.get("accessToken"), " ");
         mc.appendTag("uuid", (String) prof.get("id"), " ");
-        Runtime.getRuntime().exec(mc.getExec());
+        try {ProcessBuilder pb = new ProcessBuilder();
+        pb.redirectErrorStream();
+        pb.command(mc.getExec());
+        Process p = Runtime.getRuntime().exec(mc.getExec());
+        p.waitFor();
+        BufferedReader bf = new BufferedReader(new InputStreamReader(p.getInputStream()));
+        String line;
+        while ((line = bf.readLine()) != null) {
+            System.out.println(line);
+        } } catch (Exception ex) { ex.printStackTrace(); }
     }
 
     /**
