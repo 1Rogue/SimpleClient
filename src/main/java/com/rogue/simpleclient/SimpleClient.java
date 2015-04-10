@@ -23,7 +23,12 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.URL;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Map;
 import java.util.Scanner;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -173,23 +178,28 @@ public final class SimpleClient {
     public void openMinecraft() throws SecurityException, IOException {
         MCProc mc = new MCProc(this.natives, this.minecraftDir, this.gameDir, this.version);
         JSONObject prof = (JSONObject) this.response.get("selectedProfile");
-        mc.appendTag("username", (String) this.response.get("name"), "=");
+        mc.appendTag("username", (String) prof.get("name"), "=");
         mc.appendTag("version", this.version, " ");
         mc.appendTag("gameDir", this.minecraftDir.getAbsolutePath(), " ");
         mc.appendTag("assetsDir", new File(this.minecraftDir, "assets").getAbsolutePath(), " ");
         mc.appendTag("userProperties", "{}", " ");
         mc.appendTag("accessToken", (String) this.response.get("accessToken"), " ");
         mc.appendTag("uuid", (String) prof.get("id"), " ");
-        try {ProcessBuilder pb = new ProcessBuilder();
-        pb.redirectErrorStream();
-        pb.command(mc.getExec());
-        Process p = Runtime.getRuntime().exec(mc.getExec());
-        p.waitFor();
-        BufferedReader bf = new BufferedReader(new InputStreamReader(p.getInputStream()));
-        String line;
-        while ((line = bf.readLine()) != null) {
-            System.out.println(line);
-        } } catch (Exception ex) { ex.printStackTrace(); }
+        try {
+            ProcessBuilder pb = new ProcessBuilder();
+            pb.redirectErrorStream(true);
+            pb.command(mc.getExec());
+            Process p = Runtime.getRuntime().exec(mc.getExec());
+            p.waitFor();
+            try (BufferedReader bf = new BufferedReader(new InputStreamReader(p.getInputStream()))) {
+                String line;
+                while ((line = bf.readLine()) != null) {
+                    System.out.println(line);
+                }
+            }
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
     }
 
     /**
@@ -206,31 +216,7 @@ public final class SimpleClient {
         private final boolean output = false;
         /** The raw, unfiltered executable statement */
         private String exec = "java -Djava.library.path=%NATIVES% "
-                + "-cp %GAMEDIR%\\%VERSION%.jar;"
-                + "%MCDIR%\\libraries\\com\\mojang\\authlib\\1.5.13\\authlib-1.5.13.jar;"
-                + "%MCDIR%\\libraries\\java3d\\vecmath\\1.3.1\\vecmath-1.3.1.jar;"
-                + "%MCDIR%\\libraries\\net\\sf\\trove4j\\trove4j\\3.0.3\\trove4j-3.0.3.jar;"
-                + "%MCDIR%\\libraries\\com\\ibm\\icu\\icu4j-core-mojang\\51.2\\icu4j-core-mojang-51.2.jar;"
-                + "%MCDIR%\\libraries\\net\\sf\\jopt-simple\\jopt-simple\\4.5\\jopt-simple-4.5.jar;"
-                + "%MCDIR%\\libraries\\com\\paulscode\\codecjorbis\\20101023\\codecjorbis-20101023.jar;"
-                + "%MCDIR%\\libraries\\com\\paulscode\\codecwav\\20101023\\codecwav-20101023.jar;"
-                + "%MCDIR%\\libraries\\com\\paulscode\\libraryjavasound\\20101123\\libraryjavasound-20101123.jar;"
-                + "%MCDIR%\\libraries\\com\\paulscode\\librarylwjglopenal\\20100824\\librarylwjglopenal-20100824.jar;"
-                + "%MCDIR%\\libraries\\com\\paulscode\\soundsystem\\20120107\\soundsystem-20120107.jar;"
-                + "%MCDIR%\\libraries\\io\\netty\\netty-all\\4.0.10.Final\\netty-all-4.0.10.Final.jar;"
-                + "%MCDIR%\\libraries\\com\\google\\guava\\guava\\15.0\\guava-15.0.jar;"
-                + "%MCDIR%\\libraries\\org\\apache\\commons\\commons-lang3\\3.1\\commons-lang3-3.1.jar;"
-                + "%MCDIR%\\libraries\\commons-io\\commons-io\\2.4\\commons-io-2.4.jar;"
-                + "%MCDIR%\\libraries\\net\\java\\jinput\\jinput\\2.0.5\\jinput-2.0.5.jar;"
-                + "%MCDIR%\\libraries\\net\\java\\jutils\\jutils\\1.0.0\\jutils-1.0.0.jar;"
-                + "%MCDIR%\\libraries\\com\\google\\code\\gson\\gson\\2.2.4\\gson-2.2.4.jar;"
-                + "%MCDIR%\\libraries\\com\\mojang\\authlib\\1.2\\authlib-1.2.jar;"
-                + "%MCDIR%\\libraries\\org\\apache\\logging\\log4j\\log4j-api\\2.0-beta9\\log4j-api-2.0-beta9.jar;"
-                + "%MCDIR%\\libraries\\org\\apache\\logging\\log4j\\log4j-core\\2.0-beta9\\log4j-core-2.0-beta9.jar;"
-                + "%MCDIR%\\libraries\\org\\lwjgl\\lwjgl\\lwjgl\\2.9.1\\lwjgl-2.9.1.jar;"
-                + "%MCDIR%\\libraries\\org\\lwjgl\\lwjgl\\lwjgl_util\\2.9.1\\lwjgl_util-2.9.1.jar;"
-                + "%MCDIR%\\libraries\\org\\lwjgl\\lwjgl\\lwjgl-platform\\2.9.1\\lwjgl-platform-2.9.1-natives-windows.jar;"
-                + "%MCDIR%\\libraries\\net\\java\\jinput\\jinput-platform\\2.0.5\\jinput-platform-2.0.5-natives-windows.jar "
+                + "-cp %LIBS%%GAMEDIR%" + File.separator + "%VERSION%.jar "
                 + "net.minecraft.client.main.Main";
 
         /**
@@ -245,6 +231,9 @@ public final class SimpleClient {
          * @param version The version of minecraft to use
          */
         public MCProc(File natives, File mcdir, File gamedir, String version) {
+            this.out("exec: " + this.exec);
+            this.exec = this.exec.replaceAll("\\%LIBS\\%",
+                    Matcher.quoteReplacement(Library.getLibraryString(version)));
             this.out("exec: " + this.exec);
             this.exec = this.exec.replaceAll("\\%NATIVES\\%",
                     Matcher.quoteReplacement(natives.getAbsolutePath()));
@@ -313,6 +302,124 @@ public final class SimpleClient {
             }
         }
 
+    }
+
+    private static enum Library {
+        APACHE_COMMONS_3("org\\apache\\commons\\commons-lang3\\%s\\commons-lang3-%s", map("1.7.9", "3.1"), map("1.8.3", "3.3.2")),
+        APACHE_COMMONS_COMPRESS("org\\apache\\commons\\commons-compress\\%s\\commons-compress-%s", map("1.8.3", "1.8.1")),
+        ARGO("argo\\argo\\%s\\argo-%s", map("1.7.9", "2.25_fixed")),
+        AUTHLIB("com\\mojang\\authlib\\%s\\authlib-%s", map("1.7.9", "1.5.13"), map("1.8.3", "1.5.17")),
+        CODEC_JORBIS("com\\paulscode\\codecjorbis\\%s\\codecjorbis-%s", map("1.7.9", "20101023"), map("1.8.3", "20101023")),
+        CODEC_WAV("com\\paulscode\\codecwav\\%s\\codecwav-%s", map("1.7.9", "20101023"), map("1.8.3", "20101023")),
+        CODEC_COMMONS("commons-codec\\commons-codec\\%s\\commons-codec-%s", map("1.7.9", "1.9"), map("1.8.3", "1.9")),
+        GSON("com\\google\\code\\gson\\gson\\%s\\gson-%s", map("1.7.9", "2.2.4"), map("1.8.3", "2.2.4")),
+        GUAVA("com\\google\\guava\\guava\\%s\\guava-%s", map("1.7.9", "15.0"), map("1.8.3", "17.0")),
+        HTTP_CORE("org\\apache\\httpcomponents\\httpcore\\%s\\httpcore-%s", map("1.8.3", "4.3.2")),
+        HTTP_CLIENT("org\\apache\\httpcomponents\\httpclient\\%s\\httpclient-%s", map("1.8.3", "4.3.3")),
+        ICU4J("com\\ibm\\icu\\icu4j-core-mojang\\%s\\icu4j-core-mojang-51.2", map("1.7.9", "51.2"), map("1.8.3", "51.2")),
+        IO_COMMONS("commons-io\\commons-io\\%s\\commons-io-%s", map("1.7.9", "2.4"), map("1.8.3", "2.4")),
+        JINPUT("net\\java\\jinput\\jinput\\%s\\jinput-%s", map("1.7.9", "2.0.5"), map("1.8.3", "2.0.5")),
+        JINPUT_PLATFORM("net\\java\\jinput\\jinput-platform\\%s\\jinput-platform-%s-natives-windows", map("1.7.9", "2.0.5"), map("1.8.3", "2.0.5")),
+        JNA("net\\java\\dev\\jna\\jna\\%s\\jna-%s", map("1.8.3", "3.4.0")),
+        JNA_PLATFORM("net\\java\\dev\\jna\\platform\\%s\\platform-%s", map("1.8.3", "3.4.0")),
+        JOPT_SIMPLE("net\\sf\\jopt-simple\\jopt-simple\\%s\\jopt-simple-%s", map("1.7.9", "4.5"), map("1.8.3", "4.6")),
+        JUTILS("net\\java\\jutils\\jutils\\%s\\jutils-%s", map("1.7.9", "1.0.0"), map("1.8.3", "1.0.0")),
+        LIBRARY_JAVASOUND("libraries\\com\\paulscode\\libraryjavasound\\%s\\libraryjavasound-%s", map("1.7.9", "20101123"), map("1.8.3", "20101123")),
+        LIBRARY_LWJGL_OPENAL("com\\paulscode\\librarylwjglopenal\\%s\\librarylwjglopenal-%s", map("1.7.9", "20100824"), map("1.8.3", "20100824")),
+        LOG4J_API("org\\apache\\logging\\log4j\\log4j-api\\%s\\log4j-api-%s", map("1.7.9", "2.0-beta9"), map("1.8.3", "2.0-beta9")),
+        LOG4J_CORE("org\\apache\\logging\\log4j\\log4j-core\\%s\\log4j-core-%s", map("1.7.9", "2.0-beta9"), map("1.8.3", "2.0-beta9")),
+        LOGGING_COMMONS("commons-logging\\commons-logging\\%s\\commons-logging-%s", map("1.8.3", "1.1.3")),
+        LWJGL("libraries\\org\\lwjgl\\lwjgl\\lwjgl\\%s\\lwjgl-%s", map("1.7.9", "2.9.1"), map("1.8.3", "2.9.4-nightly-20150209")),
+        LWJGL_UTIL("org\\lwjgl\\lwjgl\\lwjgl_util\\%s\\lwjgl_util-%s", map("1.7.9", "2.9.1"), map("1.8.3", "2.9.4-nightly-20150209")),
+        LWJGL_PLATFORM("org\\lwjgl\\lwjgl\\lwjgl-platform\\%s\\lwjgl-platform-%s-natives-windows", map("1.7.9", "2.9.1"), map("1.8.3", "2.9.4-nightly-20150209")),
+        NETTY_ALL("io\\netty\\netty-all\\%s\\netty-all-%s", map("1.7.9", "4.0.10.Final"), map("1.8.3", "4.0.23.Final")),
+        OSHI("oshi-project\\oshi-core\\%s\\oshi-core-%s", map("1.8.3", "1.1")),
+        REALMS("com\\mojang\\realms\\%s\\realms-%s", map("1.8.3", "1.7.13")),
+        SOUND_SYSTEM("com\\paulscode\\soundsystem\\%s\\soundsystem-%s", map("1.7.9", "20120107"), map("1.8.3", "20120107")),
+        TROVE4J("net\\sf\\trove4j\\trove4j\\%s\\trove4j-%s", map("1.7.9", "3.0.3")),
+        TWITCH("tv\\twitch\\twitch\\%s\\twitch-%s", map("1.7.9", "5.16"), map("1.8.3", "6.5")),
+        TWITCH_PLATFORM("tv\\twitch\\twitch-platform\\%s\\twitch-%s-natives-windows-" + arch(), map("1.7.9", "5.16"), map("1.8.3", "6.5")),
+        TWITCH_EXTERNAL_PLATFORM("tv\\twitch\\twitch-external-platform\\%s\\twitch-%s-natives-windows-" + arch(), map("1.7.9", "5.16"), map("1.8.3", "6.5")),
+        VECTOR_MATH("java3d\\vecmath\\%s\\vecmath-%s", map("1.7.9", "1.3.1")),
+        ;
+
+        private final String format;
+        private final Map<String, String> vers;
+
+        @SafeVarargs
+        private Library(String format, Mapping<String, String>... vers) {
+            this.format = "%%MCDIR%%" + File.separator + "libraries" + File.separator + format.replace("\\", File.separator) + ".jar;";
+            this.vers = new HashMap<>(vers.length);
+            for (Mapping<String, String> val : vers) {
+                this.vers.put(val.getKey(), val.getValue());
+            }
+        }
+
+        public Map<String, String> getLibraryVersionMappings() {
+            return Collections.unmodifiableMap(this.vers);
+        }
+        
+        public static Set<String> getMappedVersions(String version) {
+            Set<String> back = new HashSet<>();
+            for (Library lib : Library.values()) {
+                if (lib.vers.containsKey(version)) {
+                    String repl = lib.vers.get(version);
+                    back.add(String.format(lib.format, repl, repl));
+                }
+            }
+            return back;
+        }
+        
+        public static String getLibraryString(String version) {
+            StringBuilder sb = new StringBuilder();
+            Library.getMappedVersions(version).forEach(sb::append);
+            return sb.toString();
+        }
+
+        private static Mapping<String, String> map(String key, String val) {
+            return new Mapping<>(key, val);
+        }
+        
+        private static String arch() {
+            boolean mojangUsesJVMArch = true;
+            if (mojangUsesJVMArch) {
+                return System.getProperty("os.arch").endsWith("64") ? "64" : "32";
+            } else {
+                String arch = System.getenv("PROCESSOR_ARCHITECTURE");
+                String wow64Arch = System.getenv("PROCESSOR_ARCHITEW6432");
+                return arch.endsWith("64")
+                        || wow64Arch != null && wow64Arch.endsWith("64")
+                        ? "64" : "32";
+            }
+        }
+    }
+
+    private static class Mapping<K, V> implements Map.Entry<K, V> {
+        
+        private final K key;
+        private V value;
+
+        public Mapping(K key, V value) {
+            this.key = key;
+            this.value = value;
+        }
+
+        @Override
+        public K getKey() {
+            return this.key;
+        }
+
+        @Override
+        public V getValue() {
+            return this.value;
+        }
+
+        @Override
+        public V setValue(V value) {
+            V old = this.value;
+            this.value = value;
+            return old;
+        }
     }
 
 }
