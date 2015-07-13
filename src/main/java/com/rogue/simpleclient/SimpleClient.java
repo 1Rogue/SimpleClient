@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.util.Collections;
 import java.util.HashMap;
@@ -49,7 +50,7 @@ public final class SimpleClient {
     /** The minecraft version to launch */
     private final String version;
     /** The url for Mojang's authentication server */
-    private final URL url = new URL("https://authserver.mojang.com/authenticate");
+    private final URL url;
     /** The application data folder that contains minecraft */
     private final File appData;
     /** The minecraft directory */
@@ -74,6 +75,7 @@ public final class SimpleClient {
      * @throws IOException Any type of communications failure with Mojang
      */
     public SimpleClient(Scanner input) throws IOException {
+        this.url = new URL("https://authserver.mojang.com/authenticate");
         System.out.print("What version are you launching (e.g. '1.7.9')?: ");
         this.version = input.nextLine();
         System.out.print("What is the full path for your application data folder containing minecraft?: ");
@@ -90,8 +92,7 @@ public final class SimpleClient {
     }
 
     /**
-     * Constructs and authenticates a new client instance. Will ask for input
-     * from a supplied {@link Scanner} source.
+     * Constructs and authenticates a new client instance.
      *
      * @since 1.0.0
      * @version 1.0.0
@@ -103,6 +104,28 @@ public final class SimpleClient {
      * @throws IOException Any type of communications failure with Mojang
      */
     public SimpleClient(String version, String username, String password, File appData) throws IOException {
+        this(version, appData);
+        this.connect(username, password);
+    }
+
+    /**
+     * Constructs a new, unauthentication client instance.
+     * 
+     * @since 1.0.0
+     * @version 1.0.0
+     * 
+     * @param version The minecraft version to use
+     * @param appData The location of the application data folder containing MC
+     */
+    public SimpleClient(String version, File appData) {
+        URL url;
+        try {
+            url = new URL("https://authserver.mojang.com/authenticate");
+        } catch (MalformedURLException ex) {
+            System.err.println("Bad authentication URL used!");
+            url = null;
+        }
+        this.url = url;
         this.version = version;
         this.appData = appData;
         this.minecraftDir = new File(this.appData.getAbsoluteFile(),
@@ -110,7 +133,6 @@ public final class SimpleClient {
         this.gameDir = new File(minecraftDir, "versions" + File.separator
                 + this.version + File.separatorChar);
         this.natives = new File(gameDir, "natives" + File.separatorChar);
-        this.connect(username, password);
     }
 
     /**
@@ -176,18 +198,37 @@ public final class SimpleClient {
      * @throws IOException Unobserved I/O Error
      */
     public void openMinecraft() throws SecurityException, IOException {
-        MCProc mc = new MCProc(this.natives, this.minecraftDir, this.gameDir, this.version);
         JSONObject prof = (JSONObject) this.response.get("selectedProfile");
-        mc.appendTag("username", (String) prof.get("name"), "=");
+        this.openMinecraft(UUID.fromString((String) prof.get("id")), (String) prof.get("name"));
+    }
+
+    /**
+     * Opens the minecraft client. If the client was not initialized with
+     * credentials, then the values passed to this will be used for an
+     * offline-mode client.
+     * 
+     * @since 1.0.0
+     * @version 1.0.0
+     * 
+     * @param user The {@link UUID} of the user to authenticate as
+     * @param name The in-game name to use
+     */
+    public void openMinecraft(UUID user, String name) {
+        MCProc mc = new MCProc(this.natives, this.minecraftDir, this.gameDir, this.version);
+        mc.appendTag("username", name, " ");
+        mc.appendTag("uuid", user.toString(), " ");
         mc.appendTag("version", this.version, " ");
         mc.appendTag("gameDir", this.minecraftDir.getAbsolutePath(), " ");
         mc.appendTag("assetsDir", new File(this.minecraftDir, "assets").getAbsolutePath(), " ");
         mc.appendTag("userProperties", "{}", " ");
-        mc.appendTag("accessToken", (String) this.response.get("accessToken"), " ");
-        mc.appendTag("uuid", (String) prof.get("id"), " ");
+        if (this.response != null) {
+            mc.appendTag("accessToken", (String) this.response.get("accessToken"), " ");
+        }
         try {
             ProcessBuilder pb = new ProcessBuilder();
             pb.redirectErrorStream(true);
+            System.out.println(mc.getReadableExec());
+            System.out.println(mc.getExec());
             pb.command(mc.getExec());
             Process p = Runtime.getRuntime().exec(mc.getExec());
             p.waitFor();
